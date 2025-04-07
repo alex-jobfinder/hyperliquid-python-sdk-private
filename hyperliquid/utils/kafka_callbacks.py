@@ -132,6 +132,10 @@ class ClickHouseFillKafka(KafkaCallback):
                 "account": data.get("account"),
                 "timestamp": timestamp_ns,
                 "receipt_timestamp": int(data["receipt_timestamp"] * 1_000_000_000) if "receipt_timestamp" in data else None,
+                "liquidation_id": data.get("liquidation_id"),
+                "liquidated_user": data.get('liquidated_user'),
+                "liquidation_method": data.get("liquidation_method"),
+                "liquidation_mark_price": data.get("liquidation_mark_price"),
                 "raw": json.dumps(data.get("raw", {}), indent=2, sort_keys=True) if data.get("raw") else None,
                 "raw_data": orjson.dumps(data, default=str).decode()
             }
@@ -140,6 +144,34 @@ class ClickHouseFillKafka(KafkaCallback):
             await self.producer.send_and_wait(self.topic, orjson.dumps(payload, default=str), key=key)
         except Exception as e:
             print(f"[WARN] ClickHouseFillKafka.write() failed: {e}")
+
+class ClickHouseLiquidationsKafka(KafkaCallback):
+    default_topic = 'liquidations'
+
+    async def write(self, data: dict):
+        await self._KafkaCallback__connect()
+        try:
+            payload = {
+                "exchange": data.get("exchange", "unknown"),
+                "symbol": data.get("symbol", "unknown"),
+                "side": data.get("side", "unknown"),
+                "quantity": ensure_decimal(data.get("quantity", 0.0)),
+                "price": ensure_decimal(data.get("price", 0.0)),
+                "id": data.get("id", ""),
+                "status": data.get("status", "unknown"),
+                "timestamp": int(data.get("timestamp", 0.0) * 1_000_000_000),
+                "receipt_timestamp": int(data["receipt_timestamp"] * 1_000_000_000) if "receipt_timestamp" in data else None,
+                # "raw":orjson.dumps(getattr(data, "raw", data.get("raw", {}))).decode() if data.get("raw") else None,
+                # "raw_data": orjson.dumps(data, default=str).decode()
+                "raw": json.dumps(data.get("raw", {}), indent=2, sort_keys=True) if data.get("raw") else None,
+                "raw_data": orjson.dumps(data, default=str).decode(),
+            }
+
+            key = partition_key(payload['symbol'])
+            await self.producer.send_and_wait(self.topic, orjson.dumps(payload, default=str), key=key)
+        except Exception as e:
+            print(f"[ERROR] ClickHouseLiquidationsKafka.write() failed: {e}")
+
 
 
 class ClickHouseOrderKafka(KafkaCallback):
