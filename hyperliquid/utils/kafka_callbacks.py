@@ -101,8 +101,11 @@ class KafkaCallback:
 
     async def write(self, data: dict):
         await self.__connect()
+        if self.producer is None:
+            raise RuntimeError("Kafka producer was not started successfully.")
         await self.producer.send_and_wait(self.topic, orjson.dumps(data))
-   
+
+    
 
 class ClickHouseOrderKafka(KafkaCallback):
     """
