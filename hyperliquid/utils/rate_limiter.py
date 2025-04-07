@@ -4,7 +4,7 @@ import csv
 import json
 from datetime import datetime
 from typing import Any
-import example_utils
+# import example_utils
 from hyperliquid.utils import constants
 
 import asyncio
