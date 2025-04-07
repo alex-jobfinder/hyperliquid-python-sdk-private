@@ -6,6 +6,7 @@ import orjson
 from aiokafka import AIOKafkaProducer
 from typing import Optional
 import yaml
+import json
 
 def make_my_print(source_name):
     async def _my_print(data, _receipt_time):
@@ -131,7 +132,7 @@ class ClickHouseFillKafka(KafkaCallback):
                 "account": data.get("account"),
                 "timestamp": timestamp_ns,
                 "receipt_timestamp": int(data["receipt_timestamp"] * 1_000_000_000) if "receipt_timestamp" in data else None,
-                "raw": orjson.dumps(data.get("raw", {})).decode() if data.get("raw") else None,
+                "raw": json.dumps(data.get("raw", {}), indent=2, sort_keys=True) if data.get("raw") else None,
                 "raw_data": orjson.dumps(data, default=str).decode()
             }
 
@@ -164,7 +165,7 @@ class ClickHouseOrderKafka(KafkaCallback):
                 "timestamp": timestamp_ns,
                 "account": data.get("account"),
                 "receipt_timestamp": int(data["receipt_timestamp"] * 1_000_000_000) if "receipt_timestamp" in data else None,
-                "raw": orjson.dumps(data.get("raw", {})).decode() if data.get("raw") else None,
+                "raw": json.dumps(data.get("raw", {}), indent=2, sort_keys=True) if data.get("raw") else None,
                 "raw_data": orjson.dumps(data, default=str).decode(),
             }
 
@@ -172,9 +173,6 @@ class ClickHouseOrderKafka(KafkaCallback):
             await self.producer.send_and_wait(self.topic, orjson.dumps(payload, default=str), key=key)
         except Exception as e:
             print(f"[WARN] ClickHouseOrderKafka.write() failed: {e}")
-
-
-
 
 
 
