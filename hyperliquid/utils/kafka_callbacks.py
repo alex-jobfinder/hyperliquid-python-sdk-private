@@ -74,295 +74,35 @@ class KafkaCallback:
         await self.write(data)
 
     async def __connect(self):
-        if not self.producer:
-            loop = asyncio.get_event_loop()
-            ssl_context = None
-            if self.security_protocol in ("SSL", "SASL_SSL"):
-                ssl_context = ssl.create_default_context(cafile=self.ssl_cafile)
-                if self.ssl_certfile and self.ssl_keyfile:
-                    ssl_context.load_cert_chain(certfile=self.ssl_certfile, keyfile=self.ssl_keyfile)
+        if self.producer is not None and not self.producer._closed.done():
+            return
+        loop = asyncio.get_event_loop()
+        ssl_context = None
+        if self.security_protocol in ("SSL", "SASL_SSL"):
+            ssl_context = ssl.create_default_context(cafile=self.ssl_cafile)
+            if self.ssl_certfile and self.ssl_keyfile:
+                ssl_context.load_cert_chain(certfile=self.ssl_certfile, keyfile=self.ssl_keyfile)
 
-            self.producer = AIOKafkaProducer(
-                # acks=0,
-                acks=1,
-                request_timeout_ms=10000,
-                connections_max_idle_ms=20000,
-                loop=loop,
-                bootstrap_servers=self.bootstrap,
-                client_id='cryptofeed',
-                security_protocol=self.security_protocol,
-                sasl_mechanism=self.sasl_mechanism,
-                sasl_plain_username=self.username,
-                sasl_plain_password=self.password,
-                ssl_context=ssl_context
-            )
-            await self.producer.start()
+        self.producer = AIOKafkaProducer(
+            # acks=0,
+            acks=1,
+            request_timeout_ms=10000,
+            connections_max_idle_ms=20000,
+            loop=loop,
+            bootstrap_servers=self.bootstrap,
+            client_id='cryptofeed',
+            security_protocol=self.security_protocol,
+            sasl_mechanism=self.sasl_mechanism,
+            sasl_plain_username=self.username,
+            sasl_plain_password=self.password,
+            ssl_context=ssl_context
+        )
+        await self.producer.start()
 
     async def write(self, data: dict):
         await self.__connect()
         await self.producer.send_and_wait(self.topic, orjson.dumps(data))
    
-   
-   
-"""
-
-cdef class Order:
-    cdef readonly str exchange
-    cdef readonly str symbol
-    cdef readonly str client_order_id
-    cdef readonly str side
-    cdef readonly str type
-    cdef readonly object price
-    cdef readonly object amount
-    cdef readonly str account
-    cdef readonly object timestamp
-
-    def __init__(self, symbol, client_order_id, side, type, price, amount, timestamp, account=None, exchange=None):
-        assert isinstance(price, Decimal)
-        assert isinstance(amount, Decimal)
-        assert timestamp is None or isinstance(timestamp, float)
-
-        self.symbol = symbol
-        self.client_order_id = client_order_id
-        self.side = side
-        self.type = type
-        self.price = price
-        self.amount = amount
-        self.account = account
-        self.exchange = exchange
-        self.timestamp = timestamp
-
-    @staticmethod
-    def from_dict(data: dict) -> Order:
-        return Order(
-            data['symbol'],
-            data['client_order_id'],
-            data['side'],
-            data['type'],
-            Decimal(data['price']),
-            Decimal(data['amount']),
-            data['timestamp'],
-            account=data['account'],
-            exchange=data['exchange']
-        )
-
-    cpdef dict to_dict(self, numeric_type=None, none_to=False):
-        if numeric_type is None:
-            data = {'exchange': self.exchange, 'symbol': self.symbol, 'client_order_id': self.client_order_id, 'side': self.side, 'type': self.type, 'price': self.price, 'amount': self.amount, 'account': self.account, 'timestamp': self.timestamp}
-        else:
-            data = {'exchange': self.exchange, 'symbol': self.symbol, 'client_order_id': self.client_order_id, 'side': self.side, 'type': self.type, 'price': numeric_type(self.price), 'amount': numeric_type(self.amount), 'account': self.account, 'timestamp': self.timestamp}
-        return data if not none_to else convert_none_values(data, none_to)
-
-    def __repr__(self):
-        return f'exchange: {self.exchange} symbol: {self.symbol} client_order_id: {self.client_order_id} side: {self.side} type: {self.type} price: {self.price} amount: {self.amount} account: {self.account} timestamp: {self.timestamp}'
-
-    def __eq__(self, cmp):
-        return self.exchange == cmp.exchange and self.symbol == cmp.symbol and self.type == cmp.type and self.price == cmp.price and self.amount == cmp.amount and self.timestamp == cmp.timestamp and self.account == cmp.account and self.client_order_id == cmp.client_order_id
-
-    def __hash__(self):
-        return hash(self.__repr__())
-
-
-"""
-
-class ClickHouseTradeKafka(KafkaCallback):
-    default_topic = 'trades'
-
-    async def write(self, data: dict):
-        await self._KafkaCallback__connect()
-        try:
-            # if not all(k in data for k in ("price", "amount", "timestamp")):
-            #     raise ValueError(f"Incomplete trade data: {data}")
-
-            symbol = data.get("symbol", "unknown")
-            payload = {
-                "exchange": data.get("exchange", "unknown"),
-                "symbol": symbol,
-                "side": data.get("side", "unknown"),
-                "amount": ensure_decimal(data["amount"]),
-                "price": ensure_decimal(data["price"]),
-                "timestamp": int(data["timestamp"] * 1_000_000_000),
-                "id": data.get("id"),
-                "type": data.get("type"),
-                "receipt_timestamp": int(data["receipt_timestamp"] * 1_000_000_000) if "receipt_timestamp" in data else None,
-                "raw":orjson.dumps(getattr(data, "raw", data.get("raw", {}))).decode() if data.get("raw") else None,
-                "raw_data": orjson.dumps(data, default=str).decode()
-            }
-
-            key = partition_key(symbol)
-            await self.producer.send_and_wait(self.topic, orjson.dumps(payload, default=str), key=key)
-        except Exception as e:
-            print(f"[WARN] ClickHouseTradeKafka.write() failed: {e}")
-            
-        
-"""
-
-cdef class OrderInfo:
-    cdef readonly str exchange
-    cdef readonly str symbol
-    cdef readonly str id
-    cdef readonly str client_order_id
-    cdef readonly str side
-    cdef readonly str status
-    cdef readonly str type
-    cdef readonly object price
-    cdef readonly object amount
-    cdef readonly object remaining
-    cdef readonly str account
-    cdef readonly object timestamp
-    cdef readonly object raw  # Can be dict or list
-
-    def __init__(self, exchange, symbol, id, side, status, type, price, amount, remaining, timestamp, client_order_id=None, account=None, raw=None):
-        assert isinstance(price, Decimal)
-        assert isinstance(amount, Decimal)
-        assert remaining is None or isinstance(remaining, Decimal)
-        assert timestamp is None or isinstance(timestamp, float)
-
-        self.exchange = exchange
-        self.symbol = symbol
-        self.id = id
-        self.client_order_id = client_order_id
-        self.side = side
-        self.status = status
-        self.type = type
-        self.price = price
-        self.amount = amount
-        self.remaining = remaining
-        self.account = account
-        self.timestamp = timestamp
-        self.raw = raw
-
-    cpdef set_status(self, status: str):
-        self.status = status
-
-    @staticmethod
-    def from_dict(data: dict) -> OrderInfo:
-        return OrderInfo(
-            data['exchange'],
-            data['symbol'],
-            data['id'],
-            data['side'],
-            data['status'],
-            data['type'],
-            Decimal(data['price']),
-            Decimal(data['amount']),
-            Decimal(data['remaining']) if data['remaining'] else data['remaining'],
-            data['timestamp'],
-            account=data['account'],
-            client_order_id=data['client_order_id']
-        )
-
-    cpdef dict to_dict(self, numeric_type=None, none_to=False):
-        if numeric_type is None:
-            data = {'exchange': self.exchange, 'symbol': self.symbol, 'id': self.id, 'client_order_id': self.client_order_id, 'side': self.side, 'status': self.status, 'type': self.type, 'price': self.price, 'amount': self.amount, 'remaining': self.remaining, 'account': self.account, 'timestamp': self.timestamp}
-        else:
-            data = {'exchange': self.exchange, 'symbol': self.symbol, 'id': self.id, 'client_order_id': self.client_order_id, 'side': self.side, 'status': self.status, 'type': self.type, 'price': numeric_type(self.price), 'amount': numeric_type(self.amount), 'remaining': numeric_type(self.remaining), 'account': self.account, 'timestamp': self.timestamp}
-        return data if not none_to else convert_none_values(data, none_to)
-
-    def __repr__(self):
-        return f'exchange: {self.exchange} symbol: {self.symbol} id: {self.id} client_order_id: {self.client_order_id} side: {self.side} status: {self.status} type: {self.type} price: {self.price} amount: {self.amount} remaining: {self.remaining} account: {self.account} timestamp: {self.timestamp}'
-
-    def __eq__(self, cmp):
-        return self.exchange == cmp.exchange and self.symbol == cmp.symbol and self.id == cmp.id and self.status == cmp.status and self.type == cmp.type and self.price == cmp.price and self.amount == cmp.amount and self.remaining == cmp.remaining and self.timestamp == cmp.timestamp and self.account == cmp.account and self.client_order_id == cmp.client_order_id
-
-    def __hash__(self):
-        return hash(self.__repr__())
-"""
-
-class ClickHouseTradeKafka(KafkaCallback):
-    default_topic = 'trades'
-
-    async def write(self, data: dict):
-        await self._KafkaCallback__connect()
-        try:
-            # if not all(k in data for k in ("price", "amount", "timestamp")):
-            #     raise ValueError(f"Incomplete trade data: {data}")
-
-            symbol = data.get("symbol", "unknown")
-            payload = {
-                "exchange": data.get("exchange", "unknown"),
-                "symbol": symbol,
-                "side": data.get("side", "unknown"),
-                "amount": ensure_decimal(data["amount"]),
-                "price": ensure_decimal(data["price"]),
-                "timestamp": int(data["timestamp"] * 1_000_000_000),
-                "id": data.get("id"),
-                "type": data.get("type"),
-                "receipt_timestamp": int(data["receipt_timestamp"] * 1_000_000_000) if "receipt_timestamp" in data else None,
-                "raw":orjson.dumps(getattr(data, "raw", data.get("raw", {}))).decode() if data.get("raw") else None,
-                "raw_data": orjson.dumps(data, default=str).decode()
-            }
-
-            key = partition_key(symbol)
-            await self.producer.send_and_wait(self.topic, orjson.dumps(payload, default=str), key=key)
-        except Exception as e:
-            print(f"[WARN] ClickHouseTradeKafka.write() failed: {e}")
-            
-
-"""
-cdef class Fill:
-    cdef readonly str exchange
-    cdef readonly str symbol
-    cdef readonly object price
-    cdef readonly object amount
-    cdef readonly str side
-    cdef readonly object fee
-    cdef readonly str id
-    cdef readonly str order_id
-    cdef readonly str liquidity
-    cdef readonly str type
-    cdef readonly str account
-    cdef readonly double timestamp
-    cdef readonly object raw  # can be dict or list
-
-    def __init__(self, exchange, symbol, side, amount, price, fee, id, order_id, type, liquidity, timestamp, account=None, raw=None):
-        assert isinstance(price, Decimal)
-        assert isinstance(amount, Decimal)
-        assert fee is None or isinstance(fee, Decimal)
-
-        self.exchange = exchange
-        self.symbol = symbol
-        self.side = side
-        self.amount = amount
-        self.price = price
-        self.fee = fee
-        self.id = id
-        self.order_id = order_id
-        self.type = type
-        self.liquidity = liquidity
-        self.account = account
-        self.timestamp = timestamp
-        self.raw = raw
-"""
-
-class ClickHouseTradeKafka(KafkaCallback):
-    default_topic = 'trades'
-
-    async def write(self, data: dict):
-        await self._KafkaCallback__connect()
-        try:
-            # if not all(k in data for k in ("price", "amount", "timestamp")):
-            #     raise ValueError(f"Incomplete trade data: {data}")
-
-            symbol = data.get("symbol", "unknown")
-            payload = {
-                "exchange": data.get("exchange", "unknown"),
-                "symbol": symbol,
-                "side": data.get("side", "unknown"),
-                "amount": ensure_decimal(data["amount"]),
-                "price": ensure_decimal(data["price"]),
-                "timestamp": int(data["timestamp"] * 1_000_000_000),
-                "id": data.get("id"),
-                "type": data.get("type"),
-                "receipt_timestamp": int(data["receipt_timestamp"] * 1_000_000_000) if "receipt_timestamp" in data else None,
-                "raw":orjson.dumps(getattr(data, "raw", data.get("raw", {}))).decode() if data.get("raw") else None,
-                "raw_data": orjson.dumps(data, default=str).decode()
-            }
-
-            key = partition_key(symbol)
-            await self.producer.send_and_wait(self.topic, orjson.dumps(payload, default=str), key=key)
-        except Exception as e:
-            print(f"[WARN] ClickHouseTradeKafka.write() failed: {e}")
 
 class ClickHouseOrderKafka(KafkaCallback):
     """
@@ -444,3 +184,263 @@ class ClickHouseFillKafka(KafkaCallback):
             await self.producer.send_and_wait(self.topic, orjson.dumps(payload, default=str), key=key)
         except Exception as e:
             print(f"[WARN] ClickHouseFillKafka.write() failed: {e}")
+   
+# """
+
+# cdef class Order:
+#     cdef readonly str exchange
+#     cdef readonly str symbol
+#     cdef readonly str client_order_id
+#     cdef readonly str side
+#     cdef readonly str type
+#     cdef readonly object price
+#     cdef readonly object amount
+#     cdef readonly str account
+#     cdef readonly object timestamp
+
+#     def __init__(self, symbol, client_order_id, side, type, price, amount, timestamp, account=None, exchange=None):
+#         assert isinstance(price, Decimal)
+#         assert isinstance(amount, Decimal)
+#         assert timestamp is None or isinstance(timestamp, float)
+
+#         self.symbol = symbol
+#         self.client_order_id = client_order_id
+#         self.side = side
+#         self.type = type
+#         self.price = price
+#         self.amount = amount
+#         self.account = account
+#         self.exchange = exchange
+#         self.timestamp = timestamp
+
+#     @staticmethod
+#     def from_dict(data: dict) -> Order:
+#         return Order(
+#             data['symbol'],
+#             data['client_order_id'],
+#             data['side'],
+#             data['type'],
+#             Decimal(data['price']),
+#             Decimal(data['amount']),
+#             data['timestamp'],
+#             account=data['account'],
+#             exchange=data['exchange']
+#         )
+
+#     cpdef dict to_dict(self, numeric_type=None, none_to=False):
+#         if numeric_type is None:
+#             data = {'exchange': self.exchange, 'symbol': self.symbol, 'client_order_id': self.client_order_id, 'side': self.side, 'type': self.type, 'price': self.price, 'amount': self.amount, 'account': self.account, 'timestamp': self.timestamp}
+#         else:
+#             data = {'exchange': self.exchange, 'symbol': self.symbol, 'client_order_id': self.client_order_id, 'side': self.side, 'type': self.type, 'price': numeric_type(self.price), 'amount': numeric_type(self.amount), 'account': self.account, 'timestamp': self.timestamp}
+#         return data if not none_to else convert_none_values(data, none_to)
+
+#     def __repr__(self):
+#         return f'exchange: {self.exchange} symbol: {self.symbol} client_order_id: {self.client_order_id} side: {self.side} type: {self.type} price: {self.price} amount: {self.amount} account: {self.account} timestamp: {self.timestamp}'
+
+#     def __eq__(self, cmp):
+#         return self.exchange == cmp.exchange and self.symbol == cmp.symbol and self.type == cmp.type and self.price == cmp.price and self.amount == cmp.amount and self.timestamp == cmp.timestamp and self.account == cmp.account and self.client_order_id == cmp.client_order_id
+
+#     def __hash__(self):
+#         return hash(self.__repr__())
+
+
+# """
+
+# class ClickHouseTradeKafka(KafkaCallback):
+#     default_topic = 'trades'
+
+#     async def write(self, data: dict):
+#         await self._KafkaCallback__connect()
+#         try:
+#             # if not all(k in data for k in ("price", "amount", "timestamp")):
+#             #     raise ValueError(f"Incomplete trade data: {data}")
+
+#             symbol = data.get("symbol", "unknown")
+#             payload = {
+#                 "exchange": data.get("exchange", "unknown"),
+#                 "symbol": symbol,
+#                 "side": data.get("side", "unknown"),
+#                 "amount": ensure_decimal(data["amount"]),
+#                 "price": ensure_decimal(data["price"]),
+#                 "timestamp": int(data["timestamp"] * 1_000_000_000),
+#                 "id": data.get("id"),
+#                 "type": data.get("type"),
+#                 "receipt_timestamp": int(data["receipt_timestamp"] * 1_000_000_000) if "receipt_timestamp" in data else None,
+#                 "raw":orjson.dumps(getattr(data, "raw", data.get("raw", {}))).decode() if data.get("raw") else None,
+#                 "raw_data": orjson.dumps(data, default=str).decode()
+#             }
+
+#             key = partition_key(symbol)
+#             await self.producer.send_and_wait(self.topic, orjson.dumps(payload, default=str), key=key)
+#         except Exception as e:
+#             print(f"[WARN] ClickHouseTradeKafka.write() failed: {e}")
+            
+        
+# """
+
+# cdef class OrderInfo:
+#     cdef readonly str exchange
+#     cdef readonly str symbol
+#     cdef readonly str id
+#     cdef readonly str client_order_id
+#     cdef readonly str side
+#     cdef readonly str status
+#     cdef readonly str type
+#     cdef readonly object price
+#     cdef readonly object amount
+#     cdef readonly object remaining
+#     cdef readonly str account
+#     cdef readonly object timestamp
+#     cdef readonly object raw  # Can be dict or list
+
+#     def __init__(self, exchange, symbol, id, side, status, type, price, amount, remaining, timestamp, client_order_id=None, account=None, raw=None):
+#         assert isinstance(price, Decimal)
+#         assert isinstance(amount, Decimal)
+#         assert remaining is None or isinstance(remaining, Decimal)
+#         assert timestamp is None or isinstance(timestamp, float)
+
+#         self.exchange = exchange
+#         self.symbol = symbol
+#         self.id = id
+#         self.client_order_id = client_order_id
+#         self.side = side
+#         self.status = status
+#         self.type = type
+#         self.price = price
+#         self.amount = amount
+#         self.remaining = remaining
+#         self.account = account
+#         self.timestamp = timestamp
+#         self.raw = raw
+
+#     cpdef set_status(self, status: str):
+#         self.status = status
+
+#     @staticmethod
+#     def from_dict(data: dict) -> OrderInfo:
+#         return OrderInfo(
+#             data['exchange'],
+#             data['symbol'],
+#             data['id'],
+#             data['side'],
+#             data['status'],
+#             data['type'],
+#             Decimal(data['price']),
+#             Decimal(data['amount']),
+#             Decimal(data['remaining']) if data['remaining'] else data['remaining'],
+#             data['timestamp'],
+#             account=data['account'],
+#             client_order_id=data['client_order_id']
+#         )
+
+#     cpdef dict to_dict(self, numeric_type=None, none_to=False):
+#         if numeric_type is None:
+#             data = {'exchange': self.exchange, 'symbol': self.symbol, 'id': self.id, 'client_order_id': self.client_order_id, 'side': self.side, 'status': self.status, 'type': self.type, 'price': self.price, 'amount': self.amount, 'remaining': self.remaining, 'account': self.account, 'timestamp': self.timestamp}
+#         else:
+#             data = {'exchange': self.exchange, 'symbol': self.symbol, 'id': self.id, 'client_order_id': self.client_order_id, 'side': self.side, 'status': self.status, 'type': self.type, 'price': numeric_type(self.price), 'amount': numeric_type(self.amount), 'remaining': numeric_type(self.remaining), 'account': self.account, 'timestamp': self.timestamp}
+#         return data if not none_to else convert_none_values(data, none_to)
+
+#     def __repr__(self):
+#         return f'exchange: {self.exchange} symbol: {self.symbol} id: {self.id} client_order_id: {self.client_order_id} side: {self.side} status: {self.status} type: {self.type} price: {self.price} amount: {self.amount} remaining: {self.remaining} account: {self.account} timestamp: {self.timestamp}'
+
+#     def __eq__(self, cmp):
+#         return self.exchange == cmp.exchange and self.symbol == cmp.symbol and self.id == cmp.id and self.status == cmp.status and self.type == cmp.type and self.price == cmp.price and self.amount == cmp.amount and self.remaining == cmp.remaining and self.timestamp == cmp.timestamp and self.account == cmp.account and self.client_order_id == cmp.client_order_id
+
+#     def __hash__(self):
+#         return hash(self.__repr__())
+# """
+
+# class ClickHouseTradeKafka(KafkaCallback):
+#     default_topic = 'trades'
+
+#     async def write(self, data: dict):
+#         await self._KafkaCallback__connect()
+#         try:
+#             # if not all(k in data for k in ("price", "amount", "timestamp")):
+#             #     raise ValueError(f"Incomplete trade data: {data}")
+
+#             symbol = data.get("symbol", "unknown")
+#             payload = {
+#                 "exchange": data.get("exchange", "unknown"),
+#                 "symbol": symbol,
+#                 "side": data.get("side", "unknown"),
+#                 "amount": ensure_decimal(data["amount"]),
+#                 "price": ensure_decimal(data["price"]),
+#                 "timestamp": int(data["timestamp"] * 1_000_000_000),
+#                 "id": data.get("id"),
+#                 "type": data.get("type"),
+#                 "receipt_timestamp": int(data["receipt_timestamp"] * 1_000_000_000) if "receipt_timestamp" in data else None,
+#                 "raw":orjson.dumps(getattr(data, "raw", data.get("raw", {}))).decode() if data.get("raw") else None,
+#                 "raw_data": orjson.dumps(data, default=str).decode()
+#             }
+
+#             key = partition_key(symbol)
+#             await self.producer.send_and_wait(self.topic, orjson.dumps(payload, default=str), key=key)
+#         except Exception as e:
+#             print(f"[WARN] ClickHouseTradeKafka.write() failed: {e}")
+            
+
+# """
+# cdef class Fill:
+#     cdef readonly str exchange
+#     cdef readonly str symbol
+#     cdef readonly object price
+#     cdef readonly object amount
+#     cdef readonly str side
+#     cdef readonly object fee
+#     cdef readonly str id
+#     cdef readonly str order_id
+#     cdef readonly str liquidity
+#     cdef readonly str type
+#     cdef readonly str account
+#     cdef readonly double timestamp
+#     cdef readonly object raw  # can be dict or list
+
+#     def __init__(self, exchange, symbol, side, amount, price, fee, id, order_id, type, liquidity, timestamp, account=None, raw=None):
+#         assert isinstance(price, Decimal)
+#         assert isinstance(amount, Decimal)
+#         assert fee is None or isinstance(fee, Decimal)
+
+#         self.exchange = exchange
+#         self.symbol = symbol
+#         self.side = side
+#         self.amount = amount
+#         self.price = price
+#         self.fee = fee
+#         self.id = id
+#         self.order_id = order_id
+#         self.type = type
+#         self.liquidity = liquidity
+#         self.account = account
+#         self.timestamp = timestamp
+#         self.raw = raw
+# """
+
+# class ClickHouseTradeKafka(KafkaCallback):
+#     default_topic = 'trades'
+
+#     async def write(self, data: dict):
+#         await self._KafkaCallback__connect()
+#         try:
+#             # if not all(k in data for k in ("price", "amount", "timestamp")):
+#             #     raise ValueError(f"Incomplete trade data: {data}")
+
+#             symbol = data.get("symbol", "unknown")
+#             payload = {
+#                 "exchange": data.get("exchange", "unknown"),
+#                 "symbol": symbol,
+#                 "side": data.get("side", "unknown"),
+#                 "amount": ensure_decimal(data["amount"]),
+#                 "price": ensure_decimal(data["price"]),
+#                 "timestamp": int(data["timestamp"] * 1_000_000_000),
+#                 "id": data.get("id"),
+#                 "type": data.get("type"),
+#                 "receipt_timestamp": int(data["receipt_timestamp"] * 1_000_000_000) if "receipt_timestamp" in data else None,
+#                 "raw":orjson.dumps(getattr(data, "raw", data.get("raw", {}))).decode() if data.get("raw") else None,
+#                 "raw_data": orjson.dumps(data, default=str).decode()
+#             }
+
+#             key = partition_key(symbol)
+#             await self.producer.send_and_wait(self.topic, orjson.dumps(payload, default=str), key=key)
+#         except Exception as e:
+#             print(f"[WARN] ClickHouseTradeKafka.write() failed: {e}")
