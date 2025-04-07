@@ -42,3 +42,7 @@ cleanup: ## Cleanup project
 	rm -rf build/
 
 .PHONY: all $(MAKECMDGOALS)
+
+build-wheel:  ## Build .whl file and copy it to repo root
+	poetry build
+	cp dist/*.whl .
