@@ -50,3 +50,9 @@ build-wheel:  ## Build .whl file and copy it to repo root
 # eval "$(ssh-agent -s)"
 # ssh-add -l
 # ssh-add ~/.ssh/id_ed25519_alex
+
+activate:  ## Start a new shell with the Poetry virtual environment activated
+	poetry shell
+
+fill:  ## Run fill.py with Poetry (or fallback to plain Python if not using Poetry)
+	poetry run python fill.py || python fill.py

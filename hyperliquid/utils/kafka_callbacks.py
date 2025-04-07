@@ -7,7 +7,6 @@ from aiokafka import AIOKafkaProducer
 from typing import Optional
 import yaml
 
-
 def make_my_print(source_name):
     async def _my_print(data, _receipt_time):
         print(f"[{source_name}] {data}")
@@ -131,8 +130,7 @@ class ClickHouseFillKafka(KafkaCallback):
                 "type": data.get("type", "unknown"),
                 "account": data.get("account"),
                 "timestamp": timestamp_ns,
-                "receipt_timestamp": int(data["receipt_timestamp"] * 1_000_000_000) 
-                    if "receipt_timestamp" in data else None,
+                "receipt_timestamp": int(data["receipt_timestamp"] * 1_000_000_000) if "receipt_timestamp" in data else None,
                 "raw": orjson.dumps(data.get("raw", {})).decode() if data.get("raw") else None,
                 "raw_data": orjson.dumps(data, default=str).decode()
             }
@@ -165,6 +163,7 @@ class ClickHouseOrderKafka(KafkaCallback):
                 "remaining": Decimal(data["remaining"]) if "remaining" in data and data["remaining"] else None,
                 "timestamp": timestamp_ns,
                 "account": data.get("account"),
+                "receipt_timestamp": int(data["receipt_timestamp"] * 1_000_000_000) if "receipt_timestamp" in data else None,
                 "raw": orjson.dumps(data.get("raw", {})).decode() if data.get("raw") else None,
                 "raw_data": orjson.dumps(data, default=str).decode(),
             }
