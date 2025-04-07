@@ -46,3 +46,7 @@ cleanup: ## Cleanup project
 build-wheel:  ## Build .whl file and copy it to repo root
 	poetry build
 	cp dist/*.whl .
+
+# eval "$(ssh-agent -s)"
+# ssh-add -l
+# ssh-add ~/.ssh/id_ed25519_alex
