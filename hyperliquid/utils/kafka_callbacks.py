@@ -32,6 +32,14 @@ def partition_key(symbol: str) -> Optional[bytes]:
     return symbol.encode("utf-8") if symbol else b"unknown"
 
 
+MAX_INT64 = 9223372036854775807
+
+def to_ns(ts):
+    try:
+        ns = int(ts * 1_000_000_000)
+        return min(ns, MAX_INT64)
+    except Exception:
+        return None
 
 
 class KafkaCallback:
@@ -371,7 +379,7 @@ class ClickHouseOrderKafka(KafkaCallback):
 
             # Convert the 'timestamp' to nanoseconds if present
             ts = data.get("timestamp")
-            timestamp_ns = int(ts * 1_000_000_000) if ts else None
+            timestamp_ns = to_ns(ts)
 
             payload = {
                 "exchange": data.get("exchange", "unknown"),
@@ -411,7 +419,7 @@ class ClickHouseFillKafka(KafkaCallback):
 
             # Convert the 'timestamp' to nanoseconds if present
             ts = data.get("timestamp")
-            timestamp_ns = int(ts * 1_000_000_000) if ts else None
+            timestamp_ns = to_ns(ts)
 
             payload = {
                 "exchange": data.get("exchange", "unknown"),
