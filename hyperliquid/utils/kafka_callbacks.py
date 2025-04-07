@@ -35,8 +35,14 @@ def partition_key(symbol: str) -> Optional[bytes]:
 MAX_INT64 = 9223372036854775807
 
 def to_ns(ts):
+    """
+    Converts a float/int UNIX timestamp (in seconds) to nanoseconds,
+    truncating to milliseconds first to match precision like 1744064700065000000.
+    """
     try:
-        ns = int(ts * 1_000_000_000)
+        # Truncate to nearest millisecond (three decimal places)
+        ms = int(float(ts) * 1_000)
+        ns = ms * 1_000_000  # Convert ms to ns
         return min(ns, MAX_INT64)
     except Exception:
         return None
