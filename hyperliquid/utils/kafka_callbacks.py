@@ -113,44 +113,6 @@ class KafkaCallback:
 
     
 
-class ClickHouseOrderKafka(KafkaCallback):
-    """
-    A Kafka callback for streaming order data (based on OrderInfo fields)
-    to a ClickHouse-compatible topic.
-    """
-    default_topic = 'orders'
-
-    async def write(self, data: dict):
-        await self._KafkaCallback__connect()
-        try:
-            # Obtain the 'symbol' from data for partitioning; default to 'unknown'
-            symbol = data.get("symbol", "unknown")
-
-            # Convert the 'timestamp' to nanoseconds if present
-            ts = data.get("timestamp")
-            timestamp_ns = to_ns(ts)
-
-            payload = {
-                "exchange": data.get("exchange", "unknown"),
-                "symbol": symbol,
-                "id": data.get("id"),
-                "client_order_id": data.get("client_order_id"),
-                "side": data.get("side", "unknown"),
-                "status": data.get("status", "unknown"),
-                "type": data.get("type", "unknown"),
-                "price": Decimal(data["price"]) if "price" in data else None,
-                "amount": Decimal(data["amount"]) if "amount" in data else None,
-                "remaining": Decimal(data["remaining"]) if "remaining" in data and data["remaining"] else None,
-                "timestamp": timestamp_ns,
-                "account": data.get("account"),
-                "raw": orjson.dumps(getattr(data, "raw", data.get("raw", {}))).decode() if data.get("raw") else None,
-                "raw_data": orjson.dumps(data, default=str).decode(),
-            }
-
-            key = partition_key(symbol)
-            await self.producer.send_and_wait(self.topic, orjson.dumps(payload, default=str), key=key)
-        except Exception as e:
-            print(f"[WARN] ClickHouseOrderKafka.write() failed: {e}")
 
 
 class ClickHouseFillKafka(KafkaCallback):
@@ -193,6 +155,47 @@ class ClickHouseFillKafka(KafkaCallback):
             await self.producer.send_and_wait(self.topic, orjson.dumps(payload, default=str), key=key)
         except Exception as e:
             print(f"[WARN] ClickHouseFillKafka.write() failed: {e}")
+   
+   
+
+class ClickHouseOrderKafka(KafkaCallback):
+    """
+    A Kafka callback for streaming order data (based on OrderInfo fields)
+    to a ClickHouse-compatible topic.
+    """
+    default_topic = 'orders'
+
+    async def write(self, data: dict):
+        await self._KafkaCallback__connect()
+        try:
+            # Obtain the 'symbol' from data for partitioning; default to 'unknown'
+            symbol = data.get("symbol", "unknown")
+
+            # Convert the 'timestamp' to nanoseconds if present
+            ts = data.get("timestamp")
+            timestamp_ns = to_ns(ts)
+
+            payload = {
+                "exchange": data.get("exchange", "unknown"),
+                "symbol": symbol,
+                "id": data.get("id"),
+                "client_order_id": data.get("client_order_id"),
+                "side": data.get("side", "unknown"),
+                "status": data.get("status", "unknown"),
+                "type": data.get("type", "unknown"),
+                "price": Decimal(data["price"]) if "price" in data else None,
+                "amount": Decimal(data["amount"]) if "amount" in data else None,
+                "remaining": Decimal(data["remaining"]) if "remaining" in data and data["remaining"] else None,
+                "timestamp": timestamp_ns,
+                "account": data.get("account"),
+                "raw": orjson.dumps(getattr(data, "raw", data.get("raw", {}))).decode() if data.get("raw") else None,
+                "raw_data": orjson.dumps(data, default=str).decode(),
+            }
+
+            key = partition_key(symbol)
+            await self.producer.send_and_wait(self.topic, orjson.dumps(payload, default=str), key=key)
+        except Exception as e:
+            print(f"[WARN] ClickHouseOrderKafka.write() failed: {e}")
    
 # """
 
