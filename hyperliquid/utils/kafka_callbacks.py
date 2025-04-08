@@ -27,39 +27,6 @@ def partition_key(symbol: str) -> Optional[bytes]:
     return symbol.encode("utf-8") if symbol else b"unknown"
 
 
-# def to_nanoseconds(self, ts):
-#     """
-#     Convert timestamp to nanoseconds.
-#     Handles input in seconds or milliseconds based on magnitude.
-#     """
-#     if ts is None:
-#         return None
-#     try:
-#         ts = float(ts)
-#         if ts > 1e12:  # assuming already in milliseconds
-#             return int(ts * 1_000_000)
-#         else:  # assume in seconds
-#             return int(ts * 1_000_000_000)
-#     except Exception as e:
-#         print(f"[WARN] Invalid timestamp {ts}: {e}")
-#         return None
-
-
-
-MAX_INT64 = 9223372036854775807
-
-
-def to_ns(ts):
-    """
-    Converts a float/int UNIX timestamp (in seconds) to nanoseconds,
-    truncating to milliseconds first to match precision like 1744064700065000000.
-    """
-    try:
-        ms = int(float(ts) * 1_000)
-        ns = ms * 1_000_000
-        return min(ns, MAX_INT64)
-    except Exception:
-        return None
 class KafkaCallback:
     def __init__(self, bootstrap, topic=None, numeric_type=float, none_to=None, sasl_mechanism="SCRAM-SHA-256",
                  username=None, password=None, security_protocol="SASL_SSL", ssl_cafile=None, ssl_certfile=None, ssl_keyfile=None, exchange_index=None, **kwargs):
@@ -77,15 +44,26 @@ class KafkaCallback:
         self.producer = None
         self.exchange_index = exchange_index or {}
 
-    async def __call__(self, dtype, receipt_timestamp: float):
+    # async def __call__(self, dtype, receipt_timestamp: float):
+        # if isinstance(dtype, dict):
+        #     data = dtype
+        #     data.setdefault("receipt_timestamp", receipt_timestamp)
+        # else:
+        #     data = dtype.to_dict(numeric_type=self.numeric_type, none_to=self.none_to)
+        #     if not dtype.timestamp:
+        #         data['timestamp'] = receipt_timestamp
+        #     data['receipt_timestamp'] = receipt_timestamp
+        # await self.write(data)
+    async def __call__(self, dtype):
         if isinstance(dtype, dict):
-            data = dtype
+            data = dict(dtype)  # shallow copy to avoid mutating input
         else:
             data = dtype.to_dict(numeric_type=self.numeric_type, none_to=self.none_to)
             if not dtype.timestamp:
-                data['timestamp'] = receipt_timestamp
-            data['receipt_timestamp'] = receipt_timestamp
+                data["timestamp"] = time.time()  # fallback only if timestamp missing
+
         await self.write(data)
+
 
     async def __connect(self):
         if self.producer is not None:
@@ -149,7 +127,10 @@ class ClickHouseFillKafka(KafkaCallback):
                 "type": data.get("type", "unknown"),
                 "account": data.get("account"),
                 "timestamp": int(data.get("timestamp", 0.0) * 1_000_000),
-                "receipt_timestamp": int(data["receipt_timestamp"] * 1_000_000_000) if "receipt_timestamp" in data else None,
+                "receipt_timestamp": int(data["receipt_timestamp"] * 1_000_000_000),
+                "loop_timestamp": int(data.get("loop_timestamp", 0.0) * 1_000_000_000),
+                "loop_delay_nanoseconds": data.get("loop_delay_nanoseconds"),
+                "event_loop_delay_nanoseconds": data.get("event_loop_delay_nanoseconds"),
                 "is_liquidation": data.get("is_liquidation"),
                 "liquidated_user": data.get('liquidated_user'),
                 "liquidation_method": data.get("liquidation_method"),
@@ -178,7 +159,10 @@ class ClickHouseLiquidationsDevKafka(KafkaCallback):
                 "id": data.get("id", ""),
                 "status": data.get("status", "unknown"),
                 "timestamp": int(data.get("timestamp", 0.0) * 1_000_000),
-                "receipt_timestamp": int(data["receipt_timestamp"] * 1_000_000_000) if "receipt_timestamp" in data else None,
+                "receipt_timestamp": int(data["receipt_timestamp"] * 1_000_000_000),
+                "loop_timestamp": int(data.get("loop_timestamp", 0.0) * 1_000_000_000),
+                "loop_delay_nanoseconds": data.get("loop_delay_nanoseconds"),
+                "event_loop_delay_nanoseconds": data.get("event_loop_delay_nanoseconds"),
                 # "raw":orjson.dumps(getattr(data, "raw", data.get("raw", {}))).decode() if data.get("raw") else None,
                 # "raw_data": orjson.dumps(data, default=str).decode()
                 "raw": json.dumps(data.get("raw", {}), indent=2, sort_keys=True) if data.get("raw") else None,
@@ -208,7 +192,10 @@ class ClickHouseLiquidationsKafka(KafkaCallback):
                 "id": data.get("id", ""),
                 "status": data.get("status", "unknown"),
                 "timestamp": int(data.get("timestamp", 0.0) * 1_000_000),
-                "receipt_timestamp": int(data["receipt_timestamp"] * 1_000_000_000) if "receipt_timestamp" in data else None,
+                "receipt_timestamp": int(data["receipt_timestamp"] * 1_000_000_000),
+                "loop_timestamp": int(data.get("loop_timestamp", 0.0) * 1_000_000_000),
+                "loop_delay_nanoseconds": data.get("loop_delay_nanoseconds"),
+                "event_loop_delay_nanoseconds": data.get("event_loop_delay_nanoseconds"),
                 # "raw":orjson.dumps(getattr(data, "raw", data.get("raw", {}))).decode() if data.get("raw") else None,
                 # "raw_data": orjson.dumps(data, default=str).decode()
                 "raw": json.dumps(data.get("raw", {}), indent=2, sort_keys=True) if data.get("raw") else None,
@@ -244,9 +231,13 @@ class ClickHouseOrderKafka(KafkaCallback):
                 "price": Decimal(data["price"]) if "price" in data else None,
                 "amount": Decimal(data["amount"]) if "amount" in data else None,
                 "remaining": Decimal(data["remaining"]) if "remaining" in data and data["remaining"] else None,
-                "timestamp": int(data.get("timestamp", 0.0) * 1_000_000),
                 "account": data.get("account"),
-                "receipt_timestamp": int(data["receipt_timestamp"] * 1_000_000_000) if "receipt_timestamp" in data else None,
+                "timestamp": int(data.get("timestamp", 0.0) * 1_000_000),
+                "receipt_timestamp": int(data["receipt_timestamp"] * 1_000_000_000),
+                "loop_timestamp": int(data.get("loop_timestamp", 0.0) * 1_000_000_000),
+                "loop_delay_nanoseconds": data.get("loop_delay_nanoseconds"),
+                "event_loop_delay_nanoseconds": data.get("event_loop_delay_nanoseconds"),
+                "loop_timestamp": int(loop_timestamp * 1_000_000_000),  # NEW
                 "raw": json.dumps(data.get("raw", {}), indent=2, sort_keys=True) if data.get("raw") else None,
                 "raw_data": orjson.dumps(data, default=str).decode(),
             }

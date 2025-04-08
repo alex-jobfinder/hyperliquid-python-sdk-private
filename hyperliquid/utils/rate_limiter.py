@@ -13,6 +13,44 @@ from collections import defaultdict, deque
 from math import floor
 from typing import Optional
 
+"""
+### WebSocket & Rate Limit Constraints for Hyperliquid
+
+**WebSocket Limits:**
+- Max **1000 subscriptions** total  
+- Max **10 unique users** for user-specific subscriptions  
+- Max **2000 messages/minute** sent across all WebSocket connections  
+- Max **100 inflight POST messages** across all WebSocket connections  
+
+> Use WebSockets for lowest-latency real-time data. See the Python SDK for examples.
+
+---
+
+### Rate Limits
+
+#### **Address-Based Limits**
+- Each address can send **1 request per 1 USDC** traded since inception
+- Each address starts with a **10,000 request buffer**
+- When limited:
+  - Allowed **1 request every 10 seconds**
+- Using a **100 USDC** order value only requires a **1% fill rate** to sustain usage
+
+#### **Cancel Requests**
+- Cancel limit = `min(default_limit + 100,000, default_limit * 2)`
+- Ensures cancels are allowed even when action limits are hit
+
+> These address-based limits apply only to *actions*, not info requests.
+
+---
+
+### Batched Requests
+- Batched actions (e.g. `n` orders/cancels):
+  - Count as **1 request** for **IP-based limits**
+  - Count as **n requests** for **address-based limits**
+
+---
+"""
+
 class HyperliquidRateLimiter:
     def __init__(self):
         self.lock = asyncio.Lock()
