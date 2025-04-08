@@ -146,7 +146,7 @@ class ClickHouseFillKafka(KafkaCallback):
             print(f"[WARN] ClickHouseFillKafka.write() failed: {e}")
 
 class ClickHouseLiquidationsKafka(KafkaCallback):
-    default_topic = 'liquidations'
+    default_topic = 'liquidations_dev'
 
     async def write(self, data: dict):
         await self._KafkaCallback__connect()
