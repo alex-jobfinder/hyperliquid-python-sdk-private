@@ -127,16 +127,17 @@ class ClickHouseFillKafka(KafkaCallback):
                 "type": data.get("type", "unknown"),
                 "account": data.get("account"),
 
-                # - `loop_delay_nanoseconds`: Delay (in nanoseconds) between wall-clock `receipt_timestamp` and event loop resume.
-                    # → Measures how much time passed between the coroutine being scheduled vs. when it was actually resumed.
-                # - `event_loop_delay_nanoseconds`: Delay (in nanoseconds) between exchange event time and the loop resume time.
-                    # → Measures network delay, buffering, and event propagation latency.
-
-                "timestamp": int(data.get("timestamp", 0.0) * 1_000_000),  # exchange timestamp, ms -> ns
-                "receipt_timestamp": int(data["receipt_timestamp"] * 1_000_000_000),  # wall-clock seconds -> ns
-                "loop_timestamp": int(data.get("loop_timestamp", 0)),  # already in ns
+                # "timestamp": int(data.get("timestamp", 0.0) * 1_000_000),  # exchange timestamp, ms -> ns
+                # "receipt_timestamp": int(data["receipt_timestamp"] * 1_000_000_000),  # wall-clock seconds -> ns
+                # "loop_timestamp": int(data.get("loop_timestamp", 0)),  # already in ns
+                # "loop_delay_nanoseconds": data.get("loop_delay_nanoseconds", 0),
+                # "event_loop_delay_nanoseconds": data.get("event_loop_delay_nanoseconds", 0),
+                "timestamp": data.get("timestamp", 0),  # already ns (epoch-based)
+                "receipt_timestamp": data.get("receipt_timestamp", 0),  # already ns
+                "loop_timestamp": data.get("loop_timestamp", 0),  # monotonic ns
                 "loop_delay_nanoseconds": data.get("loop_delay_nanoseconds", 0),
                 "event_loop_delay_nanoseconds": data.get("event_loop_delay_nanoseconds", 0),
+
 
                 "is_liquidation": data.get("is_liquidation"),
                 "liquidated_user": data.get('liquidated_user'),
@@ -165,11 +166,17 @@ class ClickHouseLiquidationsDevKafka(KafkaCallback):
                 "price": ensure_decimal(data.get("price", 0.0)),
                 "id": data.get("id", ""),
                 "status": data.get("status", "unknown"),
-                "timestamp": int(data.get("timestamp", 0.0) * 1_000_000),  # exchange timestamp, ms -> ns
-                "receipt_timestamp": int(data["receipt_timestamp"] * 1_000_000_000),  # wall-clock seconds -> ns
-                "loop_timestamp": int(data.get("loop_timestamp", 0)),  # already in ns
+                # "timestamp": int(data.get("timestamp", 0.0) * 1_000_000),  # exchange timestamp, ms -> ns
+                # "receipt_timestamp": int(data["receipt_timestamp"] * 1_000_000_000),  # wall-clock seconds -> ns
+                # "loop_timestamp": int(data.get("loop_timestamp", 0)),  # already in ns
+                # "loop_delay_nanoseconds": data.get("loop_delay_nanoseconds", 0),
+                # "event_loop_delay_nanoseconds": data.get("event_loop_delay_nanoseconds", 0),
+                "timestamp": data.get("timestamp", 0),  # already ns (epoch-based)
+                "receipt_timestamp": data.get("receipt_timestamp", 0),  # already ns
+                "loop_timestamp": data.get("loop_timestamp", 0),  # monotonic ns
                 "loop_delay_nanoseconds": data.get("loop_delay_nanoseconds", 0),
                 "event_loop_delay_nanoseconds": data.get("event_loop_delay_nanoseconds", 0),
+
                 # "raw":orjson.dumps(getattr(data, "raw", data.get("raw", {}))).decode() if data.get("raw") else None,
                 # "raw_data": orjson.dumps(data, default=str).decode()
                 "raw": json.dumps(data.get("raw", {}), indent=2, sort_keys=True) if data.get("raw") else None,
@@ -198,11 +205,17 @@ class ClickHouseLiquidationsKafka(KafkaCallback):
                 "price": ensure_decimal(data.get("price", 0.0)),
                 "id": data.get("id", ""),
                 "status": data.get("status", "unknown"),
-                "timestamp": int(data.get("timestamp", 0.0) * 1_000_000),  # exchange timestamp, ms -> ns
-                "receipt_timestamp": int(data["receipt_timestamp"] * 1_000_000_000),  # wall-clock seconds -> ns
-                "loop_timestamp": int(data.get("loop_timestamp", 0)),  # already in ns
+                # "timestamp": int(data.get("timestamp", 0.0) * 1_000_000),  # exchange timestamp, ms -> ns
+                # "receipt_timestamp": int(data["receipt_timestamp"] * 1_000_000_000),  # wall-clock seconds -> ns
+                # "loop_timestamp": int(data.get("loop_timestamp", 0)),  # already in ns
+                # "loop_delay_nanoseconds": data.get("loop_delay_nanoseconds", 0),
+                # "event_loop_delay_nanoseconds": data.get("event_loop_delay_nanoseconds", 0),
+                "timestamp": data.get("timestamp", 0),  # already ns (epoch-based)
+                "receipt_timestamp": data.get("receipt_timestamp", 0),  # already ns
+                "loop_timestamp": data.get("loop_timestamp", 0),  # monotonic ns
                 "loop_delay_nanoseconds": data.get("loop_delay_nanoseconds", 0),
                 "event_loop_delay_nanoseconds": data.get("event_loop_delay_nanoseconds", 0),
+
                 # "raw":orjson.dumps(getattr(data, "raw", data.get("raw", {}))).decode() if data.get("raw") else None,
                 # "raw_data": orjson.dumps(data, default=str).decode()
                 "raw": json.dumps(data.get("raw", {}), indent=2, sort_keys=True) if data.get("raw") else None,
@@ -239,12 +252,17 @@ class ClickHouseOrderKafka(KafkaCallback):
                 "amount": Decimal(data["amount"]) if "amount" in data else None,
                 "remaining": Decimal(data["remaining"]) if "remaining" in data and data["remaining"] else None,
                 "account": data.get("account"),
-                "timestamp": int(data.get("timestamp", 0.0) * 1_000_000),  # exchange timestamp, ms -> ns
-                "receipt_timestamp": int(data["receipt_timestamp"] * 1_000_000_000),  # wall-clock seconds -> ns
-                "loop_timestamp": int(data.get("loop_timestamp", 0)),  # already in ns
+                # "timestamp": int(data.get("timestamp", 0.0) * 1_000_000),  # exchange timestamp, ms -> ns
+                # "receipt_timestamp": int(data["receipt_timestamp"] * 1_000_000_000),  # wall-clock seconds -> ns
+                # "loop_timestamp": int(data.get("loop_timestamp", 0)),  # already in ns
+                # "loop_delay_nanoseconds": data.get("loop_delay_nanoseconds", 0),
+                # "event_loop_delay_nanoseconds": data.get("event_loop_delay_nanoseconds", 0),
+                "timestamp": data.get("timestamp", 0),  # already ns (epoch-based)
+                "receipt_timestamp": data.get("receipt_timestamp", 0),  # already ns
+                "loop_timestamp": data.get("loop_timestamp", 0),  # monotonic ns
                 "loop_delay_nanoseconds": data.get("loop_delay_nanoseconds", 0),
                 "event_loop_delay_nanoseconds": data.get("event_loop_delay_nanoseconds", 0),
-                "loop_timestamp": int(loop_timestamp * 1_000_000_000),  # NEW
+
                 "raw": json.dumps(data.get("raw", {}), indent=2, sort_keys=True) if data.get("raw") else None,
                 "raw_data": orjson.dumps(data, default=str).decode(),
             }
