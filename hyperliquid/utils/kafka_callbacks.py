@@ -27,6 +27,25 @@ def partition_key(symbol: str) -> Optional[bytes]:
     return symbol.encode("utf-8") if symbol else b"unknown"
 
 
+# def to_nanoseconds(self, ts):
+#     """
+#     Convert timestamp to nanoseconds.
+#     Handles input in seconds or milliseconds based on magnitude.
+#     """
+#     if ts is None:
+#         return None
+#     try:
+#         ts = float(ts)
+#         if ts > 1e12:  # assuming already in milliseconds
+#             return int(ts * 1_000_000)
+#         else:  # assume in seconds
+#             return int(ts * 1_000_000_000)
+#     except Exception as e:
+#         print(f"[WARN] Invalid timestamp {ts}: {e}")
+#         return None
+
+
+
 MAX_INT64 = 9223372036854775807
 
 
@@ -116,7 +135,6 @@ class ClickHouseFillKafka(KafkaCallback):
         await self._KafkaCallback__connect()
         try:
             symbol = data.get("symbol", "unknown")
-            timestamp_ns = to_ns(data.get("timestamp"))
 
             payload = {
                 "exchange": data.get("exchange", "unknown"),
@@ -130,9 +148,9 @@ class ClickHouseFillKafka(KafkaCallback):
                 "liquidity": data.get("liquidity"),
                 "type": data.get("type", "unknown"),
                 "account": data.get("account"),
-                "timestamp": timestamp_ns,
+                "timestamp": int(data.get("timestamp", 0.0) * 1_000_000),
                 "receipt_timestamp": int(data["receipt_timestamp"] * 1_000_000_000) if "receipt_timestamp" in data else None,
-                "liquidation_id": data.get("liquidation_id"),
+                "is_liquidation": data.get("is_liquidation"),
                 "liquidated_user": data.get('liquidated_user'),
                 "liquidation_method": data.get("liquidation_method"),
                 "liquidation_mark_price": data.get("liquidation_mark_price"),
@@ -159,12 +177,15 @@ class ClickHouseLiquidationsDevKafka(KafkaCallback):
                 "price": ensure_decimal(data.get("price", 0.0)),
                 "id": data.get("id", ""),
                 "status": data.get("status", "unknown"),
-                "timestamp": int(data.get("timestamp", 0.0) * 1_000_000_000),
+                "timestamp": int(data.get("timestamp", 0.0) * 1_000_000),
                 "receipt_timestamp": int(data["receipt_timestamp"] * 1_000_000_000) if "receipt_timestamp" in data else None,
                 # "raw":orjson.dumps(getattr(data, "raw", data.get("raw", {}))).decode() if data.get("raw") else None,
                 # "raw_data": orjson.dumps(data, default=str).decode()
                 "raw": json.dumps(data.get("raw", {}), indent=2, sort_keys=True) if data.get("raw") else None,
                 "raw_data": orjson.dumps(data, default=str).decode(),
+                "liquidated_user": data.get('liquidated_user'),
+                "liquidation_method": data.get("liquidation_method"),
+                "liquidation_mark_price": data.get("liquidation_mark_price"),
             }
 
             key = partition_key(payload['symbol'])
@@ -186,12 +207,15 @@ class ClickHouseLiquidationsKafka(KafkaCallback):
                 "price": ensure_decimal(data.get("price", 0.0)),
                 "id": data.get("id", ""),
                 "status": data.get("status", "unknown"),
-                "timestamp": int(data.get("timestamp", 0.0) * 1_000_000_000),
+                "timestamp": int(data.get("timestamp", 0.0) * 1_000_000),
                 "receipt_timestamp": int(data["receipt_timestamp"] * 1_000_000_000) if "receipt_timestamp" in data else None,
                 # "raw":orjson.dumps(getattr(data, "raw", data.get("raw", {}))).decode() if data.get("raw") else None,
                 # "raw_data": orjson.dumps(data, default=str).decode()
                 "raw": json.dumps(data.get("raw", {}), indent=2, sort_keys=True) if data.get("raw") else None,
                 "raw_data": orjson.dumps(data, default=str).decode(),
+                "liquidated_user": data.get('liquidated_user'),
+                "liquidation_method": data.get("liquidation_method"),
+                "liquidation_mark_price": data.get("liquidation_mark_price"),
             }
 
             key = partition_key(payload['symbol'])
@@ -208,7 +232,6 @@ class ClickHouseOrderKafka(KafkaCallback):
         await self._KafkaCallback__connect()
         try:
             symbol = data.get("symbol", "unknown")
-            timestamp_ns = to_ns(data.get("timestamp"))
 
             payload = {
                 "exchange": data.get("exchange", "unknown"),
@@ -221,7 +244,7 @@ class ClickHouseOrderKafka(KafkaCallback):
                 "price": Decimal(data["price"]) if "price" in data else None,
                 "amount": Decimal(data["amount"]) if "amount" in data else None,
                 "remaining": Decimal(data["remaining"]) if "remaining" in data and data["remaining"] else None,
-                "timestamp": timestamp_ns,
+                "timestamp": int(data.get("timestamp", 0.0) * 1_000_000),
                 "account": data.get("account"),
                 "receipt_timestamp": int(data["receipt_timestamp"] * 1_000_000_000) if "receipt_timestamp" in data else None,
                 "raw": json.dumps(data.get("raw", {}), indent=2, sort_keys=True) if data.get("raw") else None,
