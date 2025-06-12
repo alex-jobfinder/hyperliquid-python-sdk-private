@@ -4,6 +4,8 @@ set -e  # Exit on any error
 
 echo "Setting up HyperLiquid Mainnet Node..."
 
+# wsl.exe --install -d Ubuntu-24.04
+
 # Check if running on Ubuntu 24.04
 if ! grep -q "Ubuntu 24.04" /etc/os-release; then
     echo "Error: This script requires Ubuntu 24.04"
