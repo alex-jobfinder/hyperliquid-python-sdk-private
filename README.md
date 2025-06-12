@@ -17,6 +17,11 @@ SDK for Hyperliquid API trading with Python.
 ## Installation
 ```bash
 pip install hyperliquid-python-sdk
+
+eval "$(ssh-agent -s)"
+ssh-add -l
+ssh-add ~/.ssh/id_ed25519_alex
+
 ```
 ## Configuration 
 
