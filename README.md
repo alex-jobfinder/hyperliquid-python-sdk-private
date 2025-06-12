@@ -125,3 +125,71 @@ This project is licensed under the terms of the `MIT` license. See [LICENSE](LIC
 ## Credits
 
 This project was generated with [`python-package-template`](https://github.com/TezRomacH/python-package-template).
+
+
+## AWS
+
+```
+https://chatgpt.com/c/684a6dde-5c1c-8002-aaa8-6c61dcdc8e70
+history
+    1  sudo apt update && sudo apt install -y curl gpg lz4
+    2  echo '{"chain": "Mainnet"}' > ~/visor.json
+    3  curl https://binaries.hyperliquid.xyz/Mainnet/hl-visor   > ~/hl-visor && chmod a+x ~/hl-visor
+    4  curl https://binaries.hyperliquid.xyz/Mainnet/hl-visor.asc   > hl-visor.asc
+    5  # Assume pub_key.asc is downloaded or available from GitHub repo
+    6  gpg --import pub_key.asc
+    7  gpg --verify hl-visor.asc hl-visor
+    8  ~/hl-visor run-non-validator   --write-misc-events
+    9  cursor
+   10  sudo snap install cursor
+   11  curl -s https://raw.githubusercontent.com/hyperliquid-dex/node/main/pub_key.asc   -o pub_key.asc
+   12  gpg --import pub_key.asc
+   13  ~/hl-visor run-non-validator --write-misc-events
+   14  ls -lh ~/hl/data/misc_events/hourly/$(date +%Y-%m-%d)/
+   15  ls
+   16  cd ~/hl/data/misc_events/hourly/
+   17  ls
+   18  ls -lh ~/hl/data/misc_events/hourly/$(date +%Y-%m-%d)/
+   19  ls -lh ~/hl/data/misc_events/hourly/$(date +%Y%m%d)/
+   20  head -n 20 ~/hl/data/misc_events/hourly/20250612/6
+   21  cursor
+   22  ls
+   23  cd ~
+   24  pip install rich
+   25  sudo apt install python3-pip
+   26  nano print_liquidations.py
+   27  python3 print_liquidations.py
+   28  cd /home/ubuntu/hl/data/misc_events/hourly/20250612/6
+   29  cd hl
+   30  cd data
+   31  cd misc_events/
+   32  cd hourly
+   33  ls
+   34  cd 20250612
+   35  ls
+   36  cd 6
+   37  ls
+   38  head -n 20 ~/hl/data/misc_events/hourly/20250612/6
+   39  cd ~
+   40  nano print_liquidations.py 
+   41  code print_liquidations.py 
+   42  sudo snap install code
+   43  code print_liquidations.py 
+   44  sudo snap install code --classic
+   45  code print_liquidations.py 
+   46  rm print_liquidations.py 
+   47  nano print_liquidations.py
+   48  python3 print_liquidations.py
+   49  nano print_liquidations.py
+   50  python3 print_liquidations.py
+   51  head -n 20 ~/hl/data/misc_events/hourly/20250612/6
+   52  head -n 20000 ~/hl/data/misc_events/hourly/20250612/6
+   53  python3 print_liquidations.py
+   54  head -n 20000 ~/hl/data/misc_events/hourly/20250612/6
+   55  python3 print_liquidations.py
+   56  head -n 20000 ~/hl/data/misc_events/hourly/20250612/6
+   57  python3 print_liquidations.py
+   58  nano print_liquidations.py
+   59  python3 print_liquidations.py
+   60  history
+```
